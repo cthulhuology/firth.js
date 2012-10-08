@@ -14,10 +14,10 @@ boot = function () {
 	console.log(new Date());
 	Memory = new ArrayBuffer(RAM);
 	Memory.char = new Int8Array(Memory);
-	Memory.short = new Int16Array(Memory);
+	Memory.word = new Int16Array(Memory);
 	Memory.int = new Int32Array(Memory);
 	Memory.byte = new Uint8Array(Memory);
-	Memory.word = new Uint16Array(Memory);
+	Memory.short = new Uint16Array(Memory);
 	Memory.long = new Uint32Array(Memory);
 	main();
 	console.log(new Date());
