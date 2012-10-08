@@ -11,16 +11,19 @@ Memory = [];	// replaced with array buffer on boot
 
 // Startup the VM
 boot = function () {
-	console.log(new Date());
-	Memory = new ArrayBuffer(RAM);
-	Memory.char = new Int8Array(Memory);
-	Memory.word = new Int16Array(Memory);
-	Memory.int = new Int32Array(Memory);
-	Memory.byte = new Uint8Array(Memory);
-	Memory.short = new Uint16Array(Memory);
-	Memory.long = new Uint32Array(Memory);
+	Memory = new ArrayBuffer(RAM)
+	Memory.char = new Int8Array(Memory)
+	Memory.word = new Int16Array(Memory)
+	Memory.int = new Int32Array(Memory)
+	Memory.byte = new Uint8Array(Memory)
+	Memory.short = new Uint16Array(Memory)
+	Memory.long = new Uint32Array(Memory)
+	Memory.dump = function(offset, size) { 
+		var range = []
+		for (var i = 0; i < size; ++i) range.push(offset + i)
+		return range.map(function(x) { return Memory.long[x] })
+	}
 	main();
-	console.log(new Date());
 }
 
 stack = function() {
@@ -69,9 +72,13 @@ main = function () {
 	var d = 0;		// destination register
 	var i = 0;		// instruction pointer
 	var m = Memory;		// memory image
+	var start = (new Date()).getTime()
+	console.log("Start: ",start)
 fetch: while(true) {
-		sysclock(m);				// simulate system clock update and read all I/O ports into memory
 		if (i >= RAM/4) {			// halt the virtual machine if i is out of range
+			var stop =  (new Date()).getTime()
+			console.log("Stop: ", stop)
+			console.log("Run Time: ", (stop - start) / 1000, "s")
 			console.log("Stack Trace:");
 			console.log("IP: ", i, " Source: ", a, " Destination: ", d)
 			console.log("SP: ", s.long[32], " TMP: ", s.long[33], " Data: ", 
@@ -112,21 +119,22 @@ fetch: while(true) {
 			case 26: s.push(m.long[i++]); continue fetch;			// force fetch + immediate value
 			case 27: i = m.long[i]; continue fetch;				// force fetch + immediate value
 			case 28: r.push(i+1); i = m.long[i]; continue fetch;		// force fetch + immediate value
-			case 29: I = (s.tos() == 0 ? m.long[i] : i+1); continue fetch;	// force fetch + immediate value
-			case 30: I = (s.tos() < 0 ? m.long[i] : i+1); continue fetch;	// force fetch + immediate value
+			case 29: i = (s.tos() == 0 ? m.long[i] : i+1); continue fetch;	// force fetch + immediate value
+			case 30: i = (s.tos() < 0 ? m.long[i] : i+1); continue fetch;	// force fetch + immediate value
 			case 31: if (r.tos() > 0) {  
-					I = m.long[i]; r.tos(r.tos()-1)		// decrement and loop
+					i = m.long[i]; r.tos(r.tos()-1)		// decrement and loop
 				} else {
-					I = i + 1; r.pop()			// drop and continue
+					i = i + 1; r.pop()			// drop and continue
 				}; continue fetch;					// force fetch + immediate value
 			default:
 				console.error("Invalid instruction at: ", i, " value: ", instr & 0x1f)
+				console.log(new Date())
 				return i;
 			}
 			instr >>= 5;		// we can encode up to 12 instructions per 64 bit cell
 			continue decode;	// decode the next instruction in the stream
 		}
-	};
+	}
 }
 
 Compiler = {
@@ -134,35 +142,54 @@ Compiler = {
 		'drop','dup','over','push','pop','@','@+','!','!+','@s','!s','@d','@d',
 		';','<->','->','#','$',',','?0','?','<-', ],
 	definitions: {},
+	define: function(word,value) {
+		console.log("Define ", word, " = ", value )
+		Compiler.definitions[word] = value
+	},
+	lookup: function(word) {
+		console.log("Lookup ", word)
+		return Compiler.definitions.hasOwnProperty(word) ?
+			Compiler.definitions[word] :
+			parseInt(word)
+	},
 	compile: function(words) {									// words is an array of words
 		var count = 0										// number of operations encoded in current word
 		var instr = 0;										// current instruction long we're encoding
 		var offset = 0;										// location in memory we are target compiling
+		var lit = Compiler.instructions.indexOf('#')						// we use this opcode for literal values
 		while (words.length) {
-			var word = words.shift()
-			if ( Compiler.instructions.indexOf(word) < 0 ) {				// test to see if constant or definition
-				if (Compiler.definitions.hasOwnProperty(word)) {	
-					instr += Compiler.instructions.indexOf('#') << (5*count)	// literal instruction
-					Memory.long[offset++] = instr					// save the current instruction long
-					instr = Compiler.definitions[word]				// compile the literal value
-					count = 0							// zero the count so we advance the offset
-				} else {
-					instr += Compiler.instructions.indexOf('#') << (5*count)	// literal instruction
-					Memory.long[offset++] = instr					// save the current instruction long
-					instr = parseInt(word)						// treat it as a literal int
-					count = 0							// zero the coutn so we advance the offset
-				}
+			var word = words.shift()							// consume next word in source
+			console.log("compiling ", word, " at ", offset, ":", count)
+			if (word == ':' ) {
+				if (count != 0) Memory.long[offset++] = instr				// align to a cell boundary
+				instr = 0
+				count = 0								// reset count to 0
+				Compiler.define(words.shift(),offset)					// define this offset as next word in source 
+				continue;
+			}
+			var op = Compiler.instructions.indexOf(word)					// -1 is not an instruction
+			if ( op < 0 ) {									// test to see if constant or definition
+				instr += lit << (5*count)
+				Memory.long[offset++] = instr						// save the current instruction long
+				instr = Compiler.lookup(word)						// compile the literal value
+				count = 0								// zero the count so we advance the offset
 			} else {									// this is an instruction
-				instr += Compiler.instructions.indexOf(word) << (5*count)		
-				count = (count + 1) % 6							// we encode up to 6 instructions per long
+				console.log("opcode: ", op)
+				instr += op << (5*count)		
+				if (op > 25) {								// 26+ have literal values following
+					Memory.long[offset++] = instr					// save the current packed instruction
+					instr = Compiler.lookup(words.shift())				// consume the next word and lookup literal
+					count = 0							// reset count so we save literal value
+				} else {
+					count = (count + 1) % 6						// we encode up to 6 instructions per long
+				}
 			}
 			if (count == 0) {
 				Memory.long[offset++] = instr						// save the current instruction word
-				++offset								// increment the offset to the next long
 				instr = 0								// reset the instruction
 			}
 		}
-		Memory.long[offset] = instr						// save the current instruction word
+		Memory.long[offset] = instr								// save the last instruction word
 	},
 	eval: function(line) {
 		Compiler.compile(line.trim().split(/\s+/))
