@@ -6,11 +6,19 @@ console.log = function() {
 	Log.apply(console,arguments)
 }
 
-times = function (msg,f,x)  {
+table = document.body.appendChild(document.createElement('table'))
+row = function(x,y) { 
+	tr = table.appendChild(document.createElement('tr'))
+	
+	tr.appendChild(document.createElement('td')).innerHTML = x
+	tr.appendChild(document.createElement('td')).innerHTML = y
+}
+
+times = function (msg,f)  {
 	var start = (new Date()).getTime()
-	for (var i = 0; i < x; ++i) f(i)
+	for (var i = 0; i < 1000000; ++i) f(i)
 	var stop = (new Date()).getTime()
-	console.log(msg,(stop - start)/1000 + "s")
+	return msg + " " + (stop - start) + "ms"
 }
 
 var zeros = ones = twos = threes = fours = fives = sixes = sevens = eights = nines = 0
@@ -20,9 +28,12 @@ for (var i = 0; i < 1000000; ++i) numbers.push(Math.floor(Math.random()*10))
 var methods = [ "zero","one","two","three","four","five","six","seven","eight","nine" ];
 invokes = numbers.map(function(x) { return methods[x] })
 
-times("1,000,000 Nothings", function(x) {},1000000)
+row(times("Nothings", function(x) {}),'')
 
-times("1,000,000 Dynamic Switches", function(x) {
+var adds = 0
+row(times("Additions", function(x) { ++adds }),'')
+
+row('',times("Dynamic Switches with Numbers", function(x) {
 	switch(numbers[x]) {
 		case 9: ++nines; break;			
 		case 8: ++eights; break;
@@ -37,9 +48,9 @@ times("1,000,000 Dynamic Switches", function(x) {
 		default:
 			console.log("undefined ", numbers[x]);
 	}}
-,1000000)
+))
 
-times("1,000,000 Dynamic Switch with String", function(x) {
+row('',times("Dynamic Switch with String", function(x) {
 	switch(invokes[x]) {	
 		case "nine": ++nines; break;
 		case "eight": ++eights; break;
@@ -54,7 +65,7 @@ times("1,000,000 Dynamic Switch with String", function(x) {
 		default:
 			console.log("undefined ", invokes[x])
 	}}
-,1000000)
+))
 
 obj = { 
 	0: function() { return ++zeros },
@@ -69,13 +80,30 @@ obj = {
 	9: function() { return ++nines },
 };
 
-times("1,000,000 Dynamic Object Dispatches w/o guard", 
+row(times("Dynamic Object Dispatches with Numbers w/o guard", 
 	function(x) { obj[numbers[x]]() }
-,1000000)
-
-times("1,000,000 Dynamic Object Dispatches w/ guard",
+),times("Dynamic Object Dispatches with Numbers w/ guard",
 	function(x) {  obj.hasOwnProperty(numbers[x]) ? obj[numbers[x]]() : console.log("undefined", numbers[x]) }
-,1000000)
+))
+
+obj2= {
+	zero: function() { return ++zeros },
+	one: function() { return ++ones },
+	two: function() { return ++twos },
+	three: function() { return ++threes },
+	four: function() { return ++fours },
+	five: function() { return ++fives },
+	six: function() { return ++sixes },
+	seven: function() { return ++sevens },
+	eight: function() { return ++eights },
+	nine: function() { return ++nines },
+};
+
+row(times("Dynamic Object Dispatches with Strings w/o guard", 
+	function(x) { obj2[invokes[x]]() }
+),times("Dynamic Object Dispatches with Strings w/ guard",
+	function(x) {  obj2.hasOwnProperty(invokes[x]) ? obj2[invokes[x]]() : console.log("undefined", invokes[x]) }
+))
 	
 arr = [
 	function() { return ++zeros },
@@ -90,59 +118,70 @@ arr = [
 	function() { return ++nines },
 ]
 
-times("1,000,000 Dynamic Array Dispatches w/o guard",
+row(times("Dynamic Array Dispatches with Numbers w/o guard",
 	function(x) {  arr[numbers[x]]() }
-,1000000)
-
-times("1,000,000 Dynamic Array Dispatches w/ guard",
+),times("Dynamic Array Dispatches with Numbers w/ guard",
 	function(x) {  (numbers[x] >= 0 && numbers[x] < arr.length) ? arr[numbers[x]]() : console.log("undefined", numbers[x]) }
-,1000000)
+))
 
 
 obj = { zero :  function() { ++zeros } }
-times("1,000,000 Static Object Dispatches w/o guard",
+row(times("Static Object Dispatches w/o guard",
 	function(x) { obj.zero() }
-,1000000)
+),times("Static Object Dispatches w/ guard",
+	function(x) { typeof(obj['zero'] == 'function') ? obj.zero() : console.log("undefined") }
+))
 
 arr = [ function() { ++zeros } ]
-times("1,000,000 Static Array Dispatches w/o guard",
+row(times("Static Array Dispatches w/o guard",
 	function(x) { arr[0]() }
-,1000000)
+),'')
 
-times("1,000,000 Static Switch Dispatches",
+foo = bar = baz = 0
+row('',times("Static Switch Dispatches",
 	function(x) { switch(0) {	
 		case 0: ++zeros; break;
 		default:
 			console.log("undefined ", numbers[x]);
 	}}
-,1000000)
+))
 
-foo = bar = baz = 0
-times("1,000,000 Static Switch Dispatches for String",
+row('',times("Static Switch Dispatches for String",
 	function(x) { switch("foo") {
 		case "bar": return ++bar; break;
 		case "baz": return ++baz; break;
 		case "foo": return ++foo; break;
 		default: console.log("undefined")
 	}}
-,1000000)
+))
 
 obj = { bar : function() { return ++bar }, baz: function() { return ++baz }, foo : function() { return ++foo } }
-times("1,000,000 Static Object Dispatches for String w/o guard",
-	function(x) { obj.foo() }
-,1000000)
+row(times("Static Object Dispatches for String w/o guard",
+	function(x) { obj['foo']() }
+),times("Static Object Dispatches for String w/ guard",
+	function(x) { typeof(obj['foo']) == 'function' ? obj['foo']() : console.log("undefined") }
+))
 
-times("1,000,000 Static Object Dispatches for String w/ guard",
-	function(x) { typeof(obj['foo']) == 'function' ? obj.foo() : console.log("undefined") }
-,1000000)
+narf = {}
+narf.foo = function() { ++foo }
+row(times("Static Object Dispatches via assigned property w/o guard",
+	function(x) { narf.foo() }
+),times("Static Object Dispatches  via assigned property w/ guard",
+	function(x) { typeof(narf.foo) == "function" ? narf.foo() : console.log("undefined") }
+))
+
+row('',times("Static Object Dispatches  via assigned property w/ guard (via string)",
+	function(x) { typeof(narf['foo']) == "function" ? narf.foo() : console.log("undefined") }
+))
 
 function Foo() { return ++foo }
-times("1,000,000 Static Named Function Dispatch",
+row(times("Static Named Function Dispatch",
 	function(x) { Foo() }
-,1000000)
+),'')
 
-var FOO = function() { return ++foo }
-times("1,000,000 Static Variable Function Dispatch",
+var FOON = 0
+var FOO = function() { return ++FOON }
+row(times("Static Variable Function Dispatch",
 	function(x) { FOO() }
-,1000000)
+),'')
 
