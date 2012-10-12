@@ -30,10 +30,10 @@ rtmp = 0
 // postoptimization: Compiler.eval('1600000 push 0 ~ : loop 1 +  <- loop') on safari took 0.5 seconds, 0.085 seconds, 3.6s on FF aurora
 //			or about 9.7mips safari, 56mips chrome, 1.3mips ff
 
-main = function () {
+main = function (offset) {
 	var a = 0;		// source register
 	var d = 0;		// destination register
-	var i = 64;		// instruction pointer
+	var i = offset;		// instruction pointer
 	var m = Memory;		// memory image
 	var start = (new Date()).getTime()
 	console.log("Start: ",start)
@@ -113,32 +113,32 @@ Compiler = {
 			Compiler.definitions[word] :
 			parseInt(word)
 	},
+	offset: 64,
 	compile: function(words) {									// words is an array of words
 		var count = 0										// number of operations encoded in current word
 		var instr = 0;										// current instruction long we're encoding
-		var offset = 64;									// location in memory we are target compiling
 		var lit = Compiler.instructions.indexOf('#')						// we use this opcode for literal values
 		while (words.length) {
 			var word = words.shift()							// consume next word in source
-			// console.log("compiling ", word, " at ", offset, ":", count)
+			// console.log("compiling ", word, " at ", Compiler.offset, ":", count)
 			if (word == ':' ) {
-				if (count != 0) long[offset++] = instr					// align to a cell boundary
+				if (count != 0) long[Compiler.offset++] = instr				// align to a cell boundary
 				instr = 0
 				count = 0								// reset count to 0
-				Compiler.define(words.shift(),offset)					// define this offset as next word in source 
+				Compiler.define(words.shift(),Compiler.offset)				// define this offset as next word in source 
 				continue;
 			}
 			var op = Compiler.instructions.indexOf(word)					// -1 is not an instruction
 			if ( op < 0 ) {									// test to see if constant or definition
 				instr += lit << (5*count)
-				long[offset++] = instr							// save the current instruction long
+				long[Compiler.offset++] = instr						// save the current instruction long
 				instr = Compiler.lookup(word)						// compile the literal value
 				count = 0								// zero the count so we advance the offset
 			} else {									// this is an instruction
 				// console.log("opcode: ", op)
 				instr += op << (5*count)		
 				if (op > 25) {								// 26+ have literal values following
-					long[offset++] = instr						// save the current packed instruction
+					long[Compiler.offset++] = instr					// save the current packed instruction
 					instr = Compiler.lookup(words.shift())				// consume the next word and lookup literal
 					count = 0							// reset count so we save literal value
 				} else {
@@ -146,17 +146,21 @@ Compiler = {
 				}
 			}
 			if (count == 0) {
-				long[offset++] = instr							// save the current instruction word
+				long[Compiler.offset++] = instr						// save the current instruction word
 				instr = 0								// reset the instruction
 			}
 		}
-		long[offset] = instr									// save the last instruction word
+		long[Compiler.offset] = instr								// save the last instruction word
 	},
 	eval: function(line) {
+		var offset = Compiler.offset
 		Compiler.compile(line.trim().split(/\s+/))
-		return main()
+		retval = main(offset)
+		Compiler.offset = offset
+		for (var i = offset; i < RAM/4; ++i) long[i] = 0					// clear out all of the memory above
+		return retval
 	}
 }
 
 // and finally boot!
-main();
+main(64);
