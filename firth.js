@@ -34,6 +34,7 @@ main = function (offset) {
 	var a = 0;		// source register
 	var d = 0;		// destination register
 	var i = offset;		// instruction pointer
+	var p = 0; 		// program register
 	var m = Memory;		// memory image
 	var start = (new Date()).getTime()
 	console.log("Start: ",start)
@@ -48,51 +49,51 @@ fetch: while(true) {
 			console.log("RP: ", rp, " TMP: ", rtmp, " Data: ", dump(32,32))
 			return int[(sp&31)];
 		}
-		var instr = long[i++];			// post increment instruction pointer after reading the instruction 
+		p = long[i++];				// post increment instruction pointer after reading the instruction 
 	decode: while (true) {
-			switch(0x1f & instr) {		// check the low bits, we can pack up to 12 instructions per cell!
-			case 0:	continue fetch;		// fetch the next instruction
-			case 1: int[(sp&31)] = -int[(sp&31)]; break;
-			case 2: int[(sp-1)&31] += int[(sp&31)]; --sp; break;
-			case 3: int[(sp-1)&31] *= int[(sp&31)]; --sp; break;
-			case 4: int[(sp-1)&31] /= int[(sp&31)]; --sp; break;
-			case 5: int[(sp-1)&31] %= int[(sp&31)]; --sp; break;
-			case 6: int[(sp&31)] = ~int[sp&31]; break;
-			case 7: int[(sp-1)&31] &= int[(sp&31)]; --sp; break;
-			case 8: int[(sp-1)&31] |= int[(sp&31)]; --sp; break;
-			case 9: int[(sp-1)&31] ^= int[(sp&31)]; --sp; break;
-			case 10: --sp; break;
-			case 11: int[(sp+1)&31] = int[sp&31]; ++sp; break;
-			case 12: int[(sp+1)&31] = int[(sp-1)&31]; ++sp; break;
-			case 13: int[((++rp)&31)+32] = int[(sp--)&31]; break;
-			case 14: int[(++sp)&31] = int[((rp--)&31)+32]; break;
-			case 15: int[(++sp)&31] = int[a]; break;
-			case 16: int[(++sp)&31] = int[a]; break;
-			case 17: long[d] = long[(sp--)&31]; break;
-			case 18: long[d++] = long[(sp--)&31]; break;
-			case 19: long[(++sp)&31] = a; break;
-			case 20: a = long[(sp--)&31]; break;
-			case 21: long[(++sp)&31] = d; break;
-			case 22: d = long[(sp--)&31]; break;
-			case 23: i = long[((rp--)&31)+32]; continue fetch;					// force fetch
-			case 24: rtmp = i; i = long[(rp&31)+32]; long[(rp&31)+32] = rtmp; continue fetch;	// force fetch
-			case 25: long[((++rp)&31)+32] = i; i = long[(sp--)&31]; continue fetch;			// force fetch
-			case 26: long[(++sp)&31] = long[i++]; continue fetch;					// force fetch + immediate value
-			case 27: i = long[i]; continue fetch;							// force fetch + immediate value
-			case 28: long[((++rp)&31)+32] = i+1; i = long[i]; continue fetch;			// force fetch + immediate value
-			case 29: i = (int[sp&31] == 0 ? long[i] : i+1); continue fetch;				// force fetch + immediate value
-			case 30: i = (int[sp&31] < 0 ? long[i] : i+1); continue fetch;				// force fetch + immediate value
-			case 31: if (int[(rp&31)+32] > 0) {  
+			switch(0x1f & p) {					// check the low bits, we can pack up to 12 instructions per cell!
+			case 0:	continue fetch; // .				// fetch the next instruction
+			case 1: int[(sp&31)] = -int[(sp&31)]; break; // -
+			case 2: int[(sp-1)&31] += int[(sp&31)]; --sp; break; // +
+			case 3: int[(sp-1)&31] *= int[(sp&31)]; --sp; break; // *
+			case 4: int[(sp-1)&31] /= int[(sp&31)]; --sp; break; // /
+			case 5: int[(sp-1)&31] %= int[(sp&31)]; --sp; break; // %
+			case 6: int[(sp&31)] = ~int[sp&31]; break; // ~
+			case 7: int[(sp-1)&31] &= int[(sp&31)]; --sp; break; // &
+			case 8: int[(sp-1)&31] |= int[(sp&31)]; --sp; break; // |
+			case 9: int[(sp-1)&31] ^= int[(sp&31)]; --sp; break; // ^
+			case 10: --sp; break; // drop
+			case 11: int[(sp+1)&31] = int[sp&31]; ++sp; break;  // dup
+			case 12: int[(sp+1)&31] = int[(sp-1)&31]; ++sp; break; // over
+			case 13: int[((++rp)&31)+32] = int[(sp--)&31]; break; // push
+			case 14: int[(++sp)&31] = int[((rp--)&31)+32]; break; // pop
+			case 15: int[(++sp)&31] = int[a]; break; // @
+			case 16: int[(++sp)&31] = int[a++]; break; // @+
+			case 17: long[d] = long[(sp--)&31]; break; // !
+			case 18: long[d++] = long[(sp--)&31]; break; // !+
+			case 19: long[(++sp)&31] = a; break; // @s
+			case 20: a = long[(sp--)&31]; break; // !s
+			case 21: long[(++sp)&31] = d; break; // @d
+			case 22: d = long[(sp--)&31]; break; // !d 
+			case 23: i = long[((rp--)&31)+32]; continue fetch; // ;					// force fetch
+			case 24: rtmp = i; i = long[(rp&31)+32]; long[(rp&31)+32] = rtmp; continue fetch; // <>	// force fetch
+			case 25: long[((++rp)&31)+32] = i; i = long[(sp--)&31]; continue fetch; // ->		// force fetch
+			case 26: long[(++sp)&31] = long[i++]; continue fetch; // #				// force fetch + immediate value
+			case 27: i = long[i]; continue fetch; // $						// force fetch + immediate value
+			case 28: long[((++rp)&31)+32] = i+1; i = long[i]; continue fetch; // ,			// force fetch + immediate value
+			case 29: i = (int[sp&31] == 0 ? long[i] : i+1); continue fetch;	// ?0			// force fetch + immediate value
+			case 30: i = (int[sp&31] < 0 ? long[i] : i+1); continue fetch; // ?			// force fetch + immediate value
+			case 31: if (int[(rp&31)+32] > 0) { // <-
 					i = long[i]; int[(rp&31)+32] = int[(rp&31)+32] - 1			// decrement and loop
 				} else {
 					i = i + 1; --rp								// drop and continue
 				}; continue fetch;								// force fetch + immediate value
 			default:
-				console.error("Invalid instruction at: ", i, " value: ", instr & 0x1f)
+				console.error("Invalid instruction at: ", i, " value: ", p & 0x1f)
 				console.log(new Date())
 				return i;
 			}
-			instr >>= 5;		// we can encode up to 12 instructions per 64 bit cell
+			p >>= 5;		// we can encode up to 12 instructions per 64 bit cell
 			continue decode;	// decode the next instruction in the stream
 		}
 	}
@@ -101,7 +102,7 @@ fetch: while(true) {
 Compiler = {
 	instructions: [ '.', '-', '+', '*', '/', '%', '~', '&', '|', '^',
 		'drop','dup','over','push','pop','@','@+','!','!+','@s','!s','@d','@d',
-		';','<->','->','#','$',',','?0','?','<-', ],
+		';','<>','->','#','$',',','?0','?','<-', ],
 	definitions: {},
 	define: function(word,value) {
 		// console.log("Define ", word, " = ", value )
@@ -114,10 +115,11 @@ Compiler = {
 			parseInt(word)
 	},
 	offset: 64,
-	compile: function(words) {									// words is an array of words
+	compile: function(text) {									// text is the source code
 		var count = 0										// number of operations encoded in current word
 		var instr = 0;										// current instruction long we're encoding
 		var lit = Compiler.instructions.indexOf('#')						// we use this opcode for literal values
+		var words = text.split(/\s+/)								// words is the the array of symbols
 		while (words.length) {
 			var word = words.shift()							// consume next word in source
 			// console.log("compiling ", word, " at ", Compiler.offset, ":", count)
@@ -137,10 +139,14 @@ Compiler = {
 			} else {									// this is an instruction
 				// console.log("opcode: ", op)
 				instr += op << (5*count)		
-				if (op > 25) {								// 26+ have literal values following
-					long[Compiler.offset++] = instr					// save the current packed instruction
-					instr = Compiler.lookup(words.shift())				// consume the next word and lookup literal
-					count = 0							// reset count so we save literal value
+				if (op > 22) {								
+					if (op < 26) {							// force fetch must align to next op after
+						count = 0
+					} else {							// 26+ have literal values following
+						long[Compiler.offset++] = instr				// save the current packed instruction
+						instr = Compiler.lookup(words.shift())			// consume the next word and lookup literal
+						count = 0						// reset count so we save literal value
+					}
 				} else {
 					count = (count + 1) % 6						// we encode up to 6 instructions per long
 				}
@@ -151,16 +157,20 @@ Compiler = {
 			}
 		}
 		long[Compiler.offset] = instr								// save the last instruction word
+		return Compiler.offset++								// last cell saved
 	},
 	eval: function(line) {
 		var offset = Compiler.offset
-		Compiler.compile(line.trim().split(/\s+/))
+		Compiler.compile(line.trim())
 		retval = main(offset)
 		Compiler.offset = offset
 		for (var i = offset; i < RAM/4; ++i) long[i] = 0					// clear out all of the memory above
 		return retval
 	}
 }
+
+$ = Compiler.compile
+_ = Compiler.eval	// Because typing sucks
 
 // and finally boot!
 main(64);
